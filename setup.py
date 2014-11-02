@@ -1,12 +1,17 @@
 from distutils.core import setup, Extension
 
-vtc_scrypt_module = Extension('vtc_scrypt_new',
-                              sources=['scryptmodule.c',
-                                       'scrypt.c'],
-                              include_dirs=['.'],
-                              extra_compile_args=['-O3', '-msse3'])
+lyra2re_hash_module = Extension('lyra2re_hash',
+                               sources = ['lyra2remodule.c',
+                                          'Lyra2RE.c',
+										  'Sponge.c',
+										  'Lyra2.c',
+										  'sha3/blake.c',
+										  'sha3/groestl.c',
+										  'sha3/keccak.c',
+										  'sha3/skein.c'],
+                               include_dirs=['.', './sha3'])
 
-setup(name='vtc_scrypt_new',
-      version='1.1.5',
-      description='Bindings for scrypt-n proof of work used by Vertcoin',
-      ext_modules=[vtc_scrypt_module])
+setup (name = 'lyra2re_hash',
+       version = '1.0',
+       description = 'Bindings for Lyra2RE proof of work used by Vertcoin',
+       ext_modules = [lyra2re_hash_module])

@@ -1,12 +1,20 @@
-import lyra2re2_hash
-import weakref
-import binascii
-import StringIO
+import sys
 
-from binascii import unhexlify, hexlify
+import verthash
 
-teststart = '700000005d385ba114d079971b29a9418fd0549e7d68a95c7f168621a314201000000000578586d149fd07b22f3a8a347c516de7052f034d2b76ff68e0d6ecff9b77a45489e3fd511732011df0731000';
-testbin = unhexlify(teststart)
-hash_bin = lyra2re2_hash.getPoWHash(testbin)
+teststart = '000000203a297b4b7685170d7644b43e5a6056234cc2414edde454a87580e1967d14c1078c13ea916117b0608732f3f65c2e03b81322efc0a62bcee77d8a9371261970a58a5a715da80e031b02560ad8'
 
-print hexlify(hash_bin)
+with open('verthash.dat', 'rb') as f:
+    datfile = f.read()
+
+if sys.version_info[0] < 3:
+    testbin = teststart.decode('hex')
+else:
+    testbin = bytes.fromhex(teststart)
+
+hash_bin = verthash.getPoWHash(testbin, datfile)
+
+if sys.version_info[0] < 3:
+    print(hash_bin.encode('hex'))
+else:
+    print(hash_bin.hex())

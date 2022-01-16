@@ -22,18 +22,18 @@ static inline uint32_t fnv1a(const uint32_t a, const uint32_t b) {
     return (a ^ b) * 0x1000193;
 }
 
-void verthash_hash(const unsigned char* blob_bytes, const size_t blob_size, const unsigned char* input, const size_t input_size, unsigned char* output) {
+void verthash_hash(const unsigned char* blob_bytes, const size_t blob_size, const unsigned char* input, unsigned char* output) {
     unsigned char p1[HASH_OUT_SIZE];
-    sha3(&input[0], input_size, &p1[0], HASH_OUT_SIZE);
+    sha3(&input[0], HEADER_SIZE, &p1[0], HASH_OUT_SIZE);
 
     unsigned char p0[N_SUBSET];
 
-    unsigned char input_header[input_size];
-    memcpy(input_header, input, input_size);
+    unsigned char input_header[HEADER_SIZE];
+    memcpy(input_header, input, HEADER_SIZE);
 
     for(size_t i = 0; i < N_ITER; i++) {
     	input_header[0] += 1;
-    	sha3(&input_header[0], input_size, p0+i*P0_SIZE, P0_SIZE);
+    	sha3(&input_header[0], HEADER_SIZE, p0+i*P0_SIZE, P0_SIZE);
     }
 
     uint32_t* p0_index = (uint32_t*)p0;

@@ -3,6 +3,6 @@
 
 #include <stdint.h>
 
-void verthash_hash(const unsigned char* blob_bytes, const size_t blob_size, const unsigned char* input, const size_t input_size, unsigned char* output);
+void verthash_hash(const unsigned char* blob_bytes, const size_t blob_size, const unsigned char* input, unsigned char* output);
 
 #endif

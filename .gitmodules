@@ -1,3 +1,0 @@
-[submodule "tiny_sha3"]
-	path = tiny_sha3
-	url = https://github.com/mjosaarinen/tiny_sha3.git

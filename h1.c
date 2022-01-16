@@ -15,7 +15,6 @@ struct Graph
     int64_t pow2;
     uint8_t *pk;
     int64_t index;
-    char *fileName;
 };
 
 int64_t Log2(int64_t x)
@@ -441,7 +440,6 @@ struct Graph *NewGraph(int64_t index, char *fileName, uint8_t *pk)
     g->pow2 = pow2;
     g->pk = pk;
     g->index = index;
-    g->fileName = fileName;
 
     if (exists == 0)
     {
@@ -458,9 +456,9 @@ int main()
 
     printf("Generating PoS file...\n");
     int64_t index = 17;
-    char *hashInput = "Vertcoin PoS PoC";
+     char *hashInput = "Verthash Proof-of-Space Datafile";
     uint8_t *pk = malloc(NODE_SIZE);
-    sha3(hashInput, 16, pk, NODE_SIZE);
+    sha3(hashInput, 32, pk, NODE_SIZE);
     start = clock();
     NewGraph(index, "./verthash.dat", pk);
     end = clock();

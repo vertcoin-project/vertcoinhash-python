@@ -454,7 +454,7 @@ int main()
     clock_t start, end;
     double cpu_time_used;
 
-    printf("Generating PoS file...\n");
+    printf("Creating Verthash Datafile - may take several minutes\n");
     int64_t index = 17;
      char *hashInput = "Verthash Proof-of-Space Datafile";
     uint8_t *pk = malloc(NODE_SIZE);
@@ -463,5 +463,5 @@ int main()
     NewGraph(index, "./verthash.dat", pk);
     end = clock();
     cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
-    printf("Done generating PoS file: %f sec\n", cpu_time_used);
+    printf("Done generating Verthash Datafile: %f sec\n", cpu_time_used);
 }

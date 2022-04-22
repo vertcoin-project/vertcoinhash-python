@@ -449,8 +449,41 @@ struct Graph *NewGraph(int64_t index, char *fileName, uint8_t *pk)
     return g;
 }
 
-int main()
+int main(int argc, char *argv[])
 {
+    // parse arguments
+    int i;
+    char* output_filename = "./verthash.dat";
+    for (i = 0; i < argc; i++)
+    {
+        char const *option =  argv[i];
+        if (option[0] == '-')
+        {
+            // optional argument
+            switch (option[1])
+            {
+                case 'o':
+                    if (i+1 <= argc) {
+                        output_filename = argv[++i];
+                    }
+                    else {
+                        printf("no filename specified with -o option\n");
+                        exit(1);
+                    }
+                    break;
+                default:
+                    printf("argument flag not recognized: %s\n", option);
+                    exit(1);
+            }
+        }
+        else
+        {
+            // positional argument
+        }
+    }
+
+    printf("output_filename: %s\n", output_filename);
+
     clock_t start, end;
     double cpu_time_used;
 
@@ -460,7 +493,7 @@ int main()
     uint8_t *pk = malloc(NODE_SIZE);
     sha3(hashInput, 32, pk, NODE_SIZE);
     start = clock();
-    NewGraph(index, "./verthash.dat", pk);
+    NewGraph(index, output_filename, pk);
     end = clock();
     cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
     printf("Done generating Verthash Datafile: %f sec\n", cpu_time_used);

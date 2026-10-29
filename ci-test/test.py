@@ -1,8 +1,10 @@
 """Checks every hash against known values for a test header.
 
 Verthash needs verthash.dat: it is used if VERTHASH_DATAFILE names it or it is
-in the current directory, and otherwise skipped (unless REQUIRE_VERTHASH=1).
-With it, verthash.create_datafile() is also checked to write the same file.
+in the current directory. With it, verthash.create_datafile() is also checked
+to write the same file. Without it, REQUIRE_VERTHASH=1 has create_datafile()
+write one, checked against its known sha256, and hashes with that; otherwise
+Verthash is skipped.
 """
 import filecmp
 import hashlib
@@ -59,8 +61,9 @@ for name, (module, want) in expected.items():
     check(name, module.getPoWHash(bytearray(header)), want)  # any bytes-like object
     check_raises(name, module.getPoWHash, header[:79])
 
-datafile = os.environ.get('VERTHASH_DATAFILE') or ('verthash.dat' if os.path.exists('verthash.dat') else None)
-if datafile:
+
+def check_verthash(datafile):
+    global failed
     with open(datafile, 'rb') as f:
         data = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)  # no need to read 1.2 GiB into memory
         check('verthash', verthash.getPoWHash(header, data), VERTHASH)
@@ -75,52 +78,65 @@ if datafile:
             t.join()
         check('verthash', results[0], VERTHASH)
         failed |= len(set(results)) != 1
-        del data
+        data.close()  # Windows can't delete a mapped file
 
-    # create_datafile() releases the GIL, except to call progress_cb
+
+def check_create_datafile(tmp, reference=None):
+    """create_datafile() writes verthash.dat in tmp, the same as reference if given;
+    it releases the GIL, except to call progress_cb. Returns the file's path."""
+    global failed
+    created = os.path.join(tmp, 'verthash.dat')
+    progress = []
+    ticks = []
+    busy = True
+
+    def tick():  # runs while the datafile is generated, so the GIL is free
+        while busy:
+            ticks.append(1)
+            time.sleep(0.01)
+    ticker = threading.Thread(target=tick)
+    ticker.start()
+    t0 = time.monotonic()
+    verthash.create_datafile(created, progress_cb=progress.append)
+    elapsed = time.monotonic() - t0
+    busy = False
+    ticker.join()
+    h = hashlib.sha256()
+    with open(created, 'rb') as f:
+        while chunk := f.read(1 << 22):
+            h.update(chunk)
+    ok = (h.hexdigest() == DATAFILE_SHA256
+          and (reference is None or filecmp.cmp(created, reference, shallow=False))
+          and not os.path.exists(created + '.tmp')
+          and progress == sorted(progress) and progress[-1] == 1.0 and len(progress) >= 30
+          and len(ticks) > elapsed * 10)
+    failed |= not ok
+    print(f"datafile  created in {elapsed:.0f} s, {len(progress)} progress calls, "
+          f"sha256 {h.hexdigest()} {'ok' if ok else 'MISMATCH'}")
+
+    # an exception from progress_cb stops it, and leaves no temporary file
+    def stop(fraction):
+        raise KeyboardInterrupt
+    stopped = os.path.join(tmp, 'stopped.dat')
+    try:
+        verthash.create_datafile(stopped, stop)
+        ok = False
+    except KeyboardInterrupt:
+        ok = not os.path.exists(stopped) and not os.path.exists(stopped + '.tmp')
+    failed |= not ok
+    print(f"datafile  stops on an exception from progress_cb: {'ok' if ok else 'MISMATCH'}")
+    return created
+
+
+datafile = os.environ.get('VERTHASH_DATAFILE') or ('verthash.dat' if os.path.exists('verthash.dat') else None)
+if datafile:
+    check_verthash(datafile)
     with tempfile.TemporaryDirectory() as tmp:
-        created = os.path.join(tmp, 'verthash.dat')
-        progress = []
-        ticks = []
-        busy = True
-
-        def tick():  # runs while the datafile is generated, so the GIL is free
-            while busy:
-                ticks.append(1)
-                time.sleep(0.01)
-        ticker = threading.Thread(target=tick)
-        ticker.start()
-        t0 = time.monotonic()
-        verthash.create_datafile(created, progress_cb=progress.append)
-        elapsed = time.monotonic() - t0
-        busy = False
-        ticker.join()
-        h = hashlib.sha256()
-        with open(created, 'rb') as f:
-            while chunk := f.read(1 << 22):
-                h.update(chunk)
-        ok = (h.hexdigest() == DATAFILE_SHA256 and filecmp.cmp(created, datafile, shallow=False)
-              and not os.path.exists(created + '.tmp')
-              and progress == sorted(progress) and progress[-1] == 1.0 and len(progress) >= 30
-              and len(ticks) > elapsed * 10)
-        failed |= not ok
-        print(f"datafile  created in {elapsed:.0f} s, {len(progress)} progress calls, "
-              f"sha256 {h.hexdigest()} {'ok' if ok else 'MISMATCH'}")
-
-        # an exception from progress_cb stops it, and leaves no temporary file
-        def stop(fraction):
-            raise KeyboardInterrupt
-        stopped = os.path.join(tmp, 'stopped.dat')
-        try:
-            verthash.create_datafile(stopped, stop)
-            ok = False
-        except KeyboardInterrupt:
-            ok = not os.path.exists(stopped) and not os.path.exists(stopped + '.tmp')
-        failed |= not ok
-        print(f"datafile  stops on an exception from progress_cb: {'ok' if ok else 'MISMATCH'}")
+        check_create_datafile(tmp, reference=datafile)
 elif os.environ.get('REQUIRE_VERTHASH') == '1':
-    print('verthash  no verthash.dat: MISMATCH')
-    failed = True
+    # no verthash.dat to compare with: hash with the one create_datafile() writes
+    with tempfile.TemporaryDirectory() as tmp:
+        check_verthash(check_create_datafile(tmp))
 else:
     print('verthash  skipped (no verthash.dat; set VERTHASH_DATAFILE)')
 

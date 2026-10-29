@@ -182,32 +182,52 @@ jobs:
 
   test-verthash:
     # The tests above skip Verthash, which needs the 1.2 GiB verthash.dat.
-    # Generate it once with h1 and check the Guix wheel's hash against it.
+    # On each platform, create_datafile() writes it (checked against its
+    # sha256) and the Guix wheel hashes with it; on x86_64-linux-gnu the file
+    # is also generated with h1 first, and create_datafile() must write the same.
     needs: [build-guix]
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
-    name: test Verthash (x86_64-linux-gnu)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { host: x86_64-linux-gnu,    runner: ubuntu-24.04,     h1: true }
+          - { host: aarch64-linux-gnu,   runner: ubuntu-24.04-arm }
+          - { host: x86_64-w64-mingw32,  runner: windows-2025 }
+          - { host: x86_64-apple-darwin, runner: macos-15-intel }
+          - { host: arm64-apple-darwin,  runner: macos-15 }
+    name: test Verthash (${{ matrix.host }})
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: '3.12'
+          python-version: '3.14'
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: guix-x86_64-linux-gnu
+          name: guix-${{ matrix.host }}
           path: dist
-      - name: generate verthash.dat
+      - name: generate verthash.dat with h1
+        if: matrix.h1
         run: |
           make h1
           ./h1
           echo "a55531e843cd56b010114aaf6325b0d529ecf88f8ad47639b6ededafd721aa48  verthash.dat" | sha256sum -c -
+          echo "VERTHASH_DATAFILE=$GITHUB_WORKSPACE/verthash.dat" >> "$GITHUB_ENV"
+      - name: install
+        run: python -m pip install --no-index --no-deps dist/*.whl
       - name: test
-        run: |
-          python -m pip install --no-index --no-deps dist/*.whl
-          cd "$RUNNER_TEMP"
-          VERTHASH_DATAFILE="$GITHUB_WORKSPACE/verthash.dat" REQUIRE_VERTHASH=1 python "$GITHUB_WORKSPACE/ci-test/test.py"
+        # from outside the checkout, so the installed modules are imported
+        working-directory: ${{ runner.temp }}
+        env:
+          TEST: ${{ github.workspace }}/ci-test/test.py
+          REQUIRE_VERTHASH: 1
+        run: python "$TEST"
 
   hashes:
     runs-on: ubuntu-24.04

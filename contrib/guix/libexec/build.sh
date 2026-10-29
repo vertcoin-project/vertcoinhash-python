@@ -57,8 +57,8 @@ extract_python() {
 
 COMMON_SOURCES="scrypt.c Lyra2RE.c Sponge.c Lyra2.c sha3/blake.c sha3/groestl.c sha3/keccak.c
                 sha3/cubehash.c sha3/bmw.c sha3/skein.c h2.c tiny_sha3/sha3.c"
-# module, its source, extra flags (as setup.py)
-MODULES="verthash:verthashmodule.c:-std=c99
+# module, its sources, extra flags (as setup.py)
+MODULES="verthash:verthashmodule.c verthash_datfile.c:-std=c99
 lyra2re3_hash:lyra2re3module.c:
 lyra2re2_hash:lyra2re2module.c:
 lyra2re_hash:lyra2remodule.c:

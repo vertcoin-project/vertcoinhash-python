@@ -2,11 +2,16 @@
 
 Verthash needs verthash.dat: it is used if VERTHASH_DATAFILE names it or it is
 in the current directory, and otherwise skipped (unless REQUIRE_VERTHASH=1).
+With it, verthash.create_datafile() is also checked to write the same file.
 """
+import filecmp
+import hashlib
 import mmap
 import os
 import sys
+import tempfile
 import threading
+import time
 
 import vtc_scrypt_new
 import lyra2re_hash
@@ -26,6 +31,7 @@ expected = {
     'lyra2re3': (lyra2re3_hash, '6d38a43c52662c5a8f3e1e10dfa9f1236a27babc9a4efa9f0a49000000000000'),
 }
 VERTHASH = 'e0f6c10b4a38f35a6cdcc26d32a7ed8c3bfc5d827a9bc72647afa324b70d0463'
+DATAFILE_SHA256 = 'a55531e843cd56b010114aaf6325b0d529ecf88f8ad47639b6ededafd721aa48'
 
 failed = False
 
@@ -70,6 +76,48 @@ if datafile:
         check('verthash', results[0], VERTHASH)
         failed |= len(set(results)) != 1
         del data
+
+    # create_datafile() releases the GIL, except to call progress_cb
+    with tempfile.TemporaryDirectory() as tmp:
+        created = os.path.join(tmp, 'verthash.dat')
+        progress = []
+        ticks = []
+        busy = True
+
+        def tick():  # runs while the datafile is generated, so the GIL is free
+            while busy:
+                ticks.append(1)
+                time.sleep(0.01)
+        ticker = threading.Thread(target=tick)
+        ticker.start()
+        t0 = time.monotonic()
+        verthash.create_datafile(created, progress_cb=progress.append)
+        elapsed = time.monotonic() - t0
+        busy = False
+        ticker.join()
+        h = hashlib.sha256()
+        with open(created, 'rb') as f:
+            while chunk := f.read(1 << 22):
+                h.update(chunk)
+        ok = (h.hexdigest() == DATAFILE_SHA256 and filecmp.cmp(created, datafile, shallow=False)
+              and not os.path.exists(created + '.tmp')
+              and progress == sorted(progress) and progress[-1] == 1.0 and len(progress) >= 30
+              and len(ticks) > elapsed * 10)
+        failed |= not ok
+        print(f"datafile  created in {elapsed:.0f} s, {len(progress)} progress calls, "
+              f"sha256 {h.hexdigest()} {'ok' if ok else 'MISMATCH'}")
+
+        # an exception from progress_cb stops it, and leaves no temporary file
+        def stop(fraction):
+            raise KeyboardInterrupt
+        stopped = os.path.join(tmp, 'stopped.dat')
+        try:
+            verthash.create_datafile(stopped, stop)
+            ok = False
+        except KeyboardInterrupt:
+            ok = not os.path.exists(stopped) and not os.path.exists(stopped + '.tmp')
+        failed |= not ok
+        print(f"datafile  stops on an exception from progress_cb: {'ok' if ok else 'MISMATCH'}")
 elif os.environ.get('REQUIRE_VERTHASH') == '1':
     print('verthash  no verthash.dat: MISMATCH')
     failed = True

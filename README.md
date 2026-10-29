@@ -63,7 +63,20 @@ python test.py
 
 ## Building verthash.dat
 
-h1 generates verthash.dat
+`verthash.create_datafile(path, progress_cb=None)` writes verthash.dat to `path` (replacing any file there),
+in about 15 to 30 seconds on a desktop. It is a port of Vertcoin Core's generator: the file is written through a
+memory map of `path + '.tmp'`, which is renamed to `path` when done, so it needs no 1.2 GiB of memory.
+The GIL is released while it runs, except to call `progress_cb(fraction)` about 40 times:
+
+```python
+import verthash
+
+verthash.create_datafile('verthash.dat', progress_cb=lambda f: print(f"{f:.0%}"))
+```
+
+An exception raised by `progress_cb` stops the generation and is raised from `create_datafile`. Other errors raise `OSError`.
+
+The h1 program generates it too:
 ```
 git clone https://github.com/vertcoin-project/vertcoinhash-python && cd vertcoinhash-python
 make all

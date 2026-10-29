@@ -40,8 +40,8 @@ class BuildExt(build_ext):
         super().build_extensions()
 
 
-def extension(name, module_source, unix_compile_args=()):
-    ext = Extension(name, sources=vertcoinsources + [module_source], include_dirs=vertcoinincludes)
+def extension(name, module_sources, unix_compile_args=()):
+    ext = Extension(name, sources=vertcoinsources + module_sources, include_dirs=vertcoinincludes)
     ext.unix_compile_args = list(unix_compile_args)
     return ext
 
@@ -66,9 +66,9 @@ setup(name='vertcoinhash',
       ],
       cmdclass={'build_ext': BuildExt},
       ext_modules=[
-          extension('verthash', 'verthashmodule.c', ['-std=c99']),
-          extension('lyra2re3_hash', 'lyra2re3module.c'),
-          extension('lyra2re2_hash', 'lyra2re2module.c'),
-          extension('lyra2re_hash', 'lyra2remodule.c'),
-          extension('vtc_scrypt_new', 'scryptmodule.c'),
+          extension('verthash', ['verthashmodule.c', 'verthash_datfile.c'], ['-std=c99']),
+          extension('lyra2re3_hash', ['lyra2re3module.c']),
+          extension('lyra2re2_hash', ['lyra2re2module.c']),
+          extension('lyra2re_hash', ['lyra2remodule.c']),
+          extension('vtc_scrypt_new', ['scryptmodule.c']),
       ])

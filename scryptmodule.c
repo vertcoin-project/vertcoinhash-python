@@ -34,36 +34,27 @@ static unsigned char getNfactor(char* blockheader) {
     return N;
 }
 
+#define HEADER_SIZE 80
+
 static PyObject *scrypt_getpowhash(PyObject *self, PyObject *args)
 {
-    char *output;
-    PyObject *value;
-#if PY_MAJOR_VERSION >= 3
-    PyBytesObject *input;
-#else
-    PyStringObject *input;
-#endif
+    Py_buffer input;
+    char output[32];
     unsigned int N;
-    if (!PyArg_ParseTuple(args, "S", &input))
+
+    if (!PyArg_ParseTuple(args, "y*", &input))
         return NULL;
-    Py_INCREF(input);
-    output = PyMem_Malloc(32);
-#if PY_MAJOR_VERSION >= 3
-    N = 1 << (getNfactor((char *)PyBytes_AsString((PyObject*) input)) + 1);
-    scrypt_N_1_1_256((char *)PyBytes_AsString((PyObject*) input), output, N);
-#else
-    N = 1 << (getNfactor((char *)PyString_AsString((PyObject*) input)) + 1);
-    scrypt_N_1_1_256((char *)PyString_AsString((PyObject*) input), output, N);
-#endif
-    Py_DECREF(input);
-    
-#if PY_MAJOR_VERSION >= 3
-    value = Py_BuildValue("y#", output, 32);
-#else
-    value = Py_BuildValue("s#", output, 32);
-#endif
-    PyMem_Free(output);
-    return value;
+    if (input.len != HEADER_SIZE) {
+        PyBuffer_Release(&input);
+        PyErr_SetString(PyExc_ValueError, "block header must be 80 bytes");
+        return NULL;
+    }
+    Py_BEGIN_ALLOW_THREADS
+    N = 1 << (getNfactor((char *)input.buf) + 1);
+    scrypt_N_1_1_256((const char *)input.buf, output, N);
+    Py_END_ALLOW_THREADS
+    PyBuffer_Release(&input);
+    return PyBytes_FromStringAndSize(output, 32);
 }
 
 static PyMethodDef ScryptMethods[] = {
@@ -71,11 +62,10 @@ static PyMethodDef ScryptMethods[] = {
     { NULL, NULL, 0, NULL }
 };
 
-#if PY_MAJOR_VERSION >= 3
 static struct PyModuleDef VTCScryptModule = {
     PyModuleDef_HEAD_INIT,
     "vtc_scrypt_new",
-    "...",
+    "scrypt-N proof of work hash used by Vertcoin",
     -1,
     ScryptMethods
 };
@@ -83,8 +73,3 @@ static struct PyModuleDef VTCScryptModule = {
 PyMODINIT_FUNC PyInit_vtc_scrypt_new(void) {
     return PyModule_Create(&VTCScryptModule);
 }
-#else
-PyMODINIT_FUNC initvtc_scrypt_new(void) {
-    (void) Py_InitModule("vtc_scrypt_new", ScryptMethods);
-}
-#endif

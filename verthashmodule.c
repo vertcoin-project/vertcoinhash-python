@@ -3,43 +3,33 @@
 
 #include "h2.h"
 
+#define HEADER_SIZE 80
+#define HASH_OUT_SIZE 32
+
+/* getPoWHash(header, datfile): the datafile can be any bytes-like object,
+ * e.g. bytes or a read-only mmap of verthash.dat, so it need not be read into memory. */
 static PyObject *verthash_getpowhash(PyObject *self, PyObject *args)
 {
-    char *output;
-    PyObject *value;
-#if PY_MAJOR_VERSION >= 3
-    PyBytesObject *input;
-    PyBytesObject *datfile;
-#else
-    PyStringObject *input;
-    PyStringObject *datfile;
-#endif
-    if (!PyArg_ParseTuple(args, "SS", &input, &datfile))
+    Py_buffer input, datfile;
+    unsigned char output[HASH_OUT_SIZE];
+
+    if (!PyArg_ParseTuple(args, "y*y*", &input, &datfile))
         return NULL;
-    Py_INCREF(input);
-    Py_INCREF(datfile);
-    output = PyMem_Malloc(32);
-
-#if PY_MAJOR_VERSION >= 3
-    const Py_ssize_t datfile_size = PyBytes_Size((PyObject*) datfile);
-    const Py_ssize_t input_size = PyBytes_Size((PyObject*) input);
-
-    verthash_hash(PyBytes_AsString((PyObject*) datfile), datfile_size, PyBytes_AsString((PyObject*) input), output);
-#else
-    const Py_ssize_t datfile_size = PyString_Size((PyObject*) datfile);
-    const Py_ssize_t input_size = PyString_Size((PyObject*) input);
-
-    verthash_hash(PyString_AsString((PyObject*) datfile), datfile_size, PyString_AsString((PyObject*) input), output);
-#endif
-    Py_DECREF(input);
-    Py_DECREF(datfile);
-#if PY_MAJOR_VERSION >= 3
-    value = Py_BuildValue("y#", output, 32);
-#else
-    value = Py_BuildValue("s#", output, 32);
-#endif
-    PyMem_Free(output);
-    return value;
+    if (input.len != HEADER_SIZE || datfile.len < HASH_OUT_SIZE) {
+        const char *msg = input.len != HEADER_SIZE
+                          ? "block header must be 80 bytes" : "verthash datafile is too small";
+        PyBuffer_Release(&input);
+        PyBuffer_Release(&datfile);
+        PyErr_SetString(PyExc_ValueError, msg);
+        return NULL;
+    }
+    Py_BEGIN_ALLOW_THREADS
+    verthash_hash((const unsigned char *)datfile.buf, (size_t)datfile.len,
+                  (const unsigned char *)input.buf, output);
+    Py_END_ALLOW_THREADS
+    PyBuffer_Release(&input);
+    PyBuffer_Release(&datfile);
+    return PyBytes_FromStringAndSize((const char *)output, HASH_OUT_SIZE);
 }
 
 static PyMethodDef VerthashMethods[] = {
@@ -47,11 +37,10 @@ static PyMethodDef VerthashMethods[] = {
     { NULL, NULL, 0, NULL }
 };
 
-#if PY_MAJOR_VERSION >= 3
 static struct PyModuleDef VerthashModule = {
     PyModuleDef_HEAD_INIT,
     "verthash",
-    "...",
+    "Verthash proof of work hash used by Vertcoin",
     -1,
     VerthashMethods
 };
@@ -59,10 +48,3 @@ static struct PyModuleDef VerthashModule = {
 PyMODINIT_FUNC PyInit_verthash(void) {
     return PyModule_Create(&VerthashModule);
 }
-
-#else
-
-PyMODINIT_FUNC initverthash(void) {
-    (void) Py_InitModule("verthash", VerthashMethods);
-}
-#endif

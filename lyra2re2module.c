@@ -3,56 +3,40 @@
 
 #include "Lyra2RE.h"
 
-static PyObject *lyra2re2_getpowhash(PyObject *self, PyObject *args)
-{
-    char *output;
-    PyObject *value;
-#if PY_MAJOR_VERSION >= 3
-    PyBytesObject *input;
-#else
-    PyStringObject *input;
-#endif
-    if (!PyArg_ParseTuple(args, "S", &input))
-        return NULL;
-    Py_INCREF(input);
-    output = PyMem_Malloc(32);
+#define HEADER_SIZE 80
 
-#if PY_MAJOR_VERSION >= 3
-    lyra2re2_hash((char *)PyBytes_AsString((PyObject*) input), output);
-#else
-    lyra2re2_hash((char *)PyString_AsString((PyObject*) input), output);
-#endif
-    Py_DECREF(input);
-#if PY_MAJOR_VERSION >= 3
-    value = Py_BuildValue("y#", output, 32);
-#else
-    value = Py_BuildValue("s#", output, 32);
-#endif
-    PyMem_Free(output);
-    return value;
+static PyObject *lyra2re2_hash_getpowhash(PyObject *self, PyObject *args)
+{
+    Py_buffer input;
+    char output[32];
+
+    if (!PyArg_ParseTuple(args, "y*", &input))
+        return NULL;
+    if (input.len != HEADER_SIZE) {
+        PyBuffer_Release(&input);
+        PyErr_SetString(PyExc_ValueError, "block header must be 80 bytes");
+        return NULL;
+    }
+    Py_BEGIN_ALLOW_THREADS
+    lyra2re2_hash((const char *)input.buf, output);
+    Py_END_ALLOW_THREADS
+    PyBuffer_Release(&input);
+    return PyBytes_FromStringAndSize(output, 32);
 }
 
-static PyMethodDef Lyra2RE2Methods[] = {
-    { "getPoWHash", lyra2re2_getpowhash, METH_VARARGS, "Returns the proof of work hash using Lyra2RE hash" },
+static PyMethodDef Lyra2REv2Methods[] = {
+    { "getPoWHash", lyra2re2_hash_getpowhash, METH_VARARGS, "Returns the proof of work hash using Lyra2REv2" },
     { NULL, NULL, 0, NULL }
 };
 
-#if PY_MAJOR_VERSION >= 3
-static struct PyModuleDef Lyra2RE2Module = {
+static struct PyModuleDef Lyra2REv2Module = {
     PyModuleDef_HEAD_INIT,
     "lyra2re2_hash",
-    "...",
+    "Lyra2REv2 proof of work hash used by Vertcoin",
     -1,
-    Lyra2RE2Methods
+    Lyra2REv2Methods
 };
 
 PyMODINIT_FUNC PyInit_lyra2re2_hash(void) {
-    return PyModule_Create(&Lyra2RE2Module);
+    return PyModule_Create(&Lyra2REv2Module);
 }
-
-#else
-
-PyMODINIT_FUNC initlyra2re2_hash(void) {
-    (void) Py_InitModule("lyra2re2_hash", Lyra2RE2Methods);
-}
-#endif

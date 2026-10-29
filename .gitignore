@@ -1,2 +1,6 @@
 *.exe
 *.dat
+
+# guix builds (contrib/guix)
+/guix-build-*/
+/guix-cache/

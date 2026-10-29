@@ -1,0 +1,3 @@
+# Byte-identical to Bitcoin Core's: Guix hashes them into the toolchains, so line
+# endings must never be converted
+contrib/guix/patches/*.patch -text

@@ -1,0 +1,246 @@
+name: guix
+
+# Builds the wheels and sdist with contrib/guix/guix-build, one job per
+# platform, as Feather Wallet does; tests each wheel on its own platform; and on
+# a tag starting with 'v' uploads exactly those files to PyPI. The files should
+# match a local Guix build of the same commit byte for byte; the hashes are in
+# the run's summary to compare.
+
+# Only tags and manual runs: each job builds the cross toolchains from source,
+# which can take hours of the 6-hour job limit
+on:
+  push:
+    tags:
+      - '*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: guix-${{ github.ref }}
+  # never cancel a tag's upload
+  cancel-in-progress: false
+
+jobs:
+  build-guix:
+    runs-on: ubuntu-24.04
+    # The cross toolchains in manifest.scm are built from source on a cold run
+    timeout-minutes: 360
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        host:
+          - sdist
+          - x86_64-linux-gnu
+          - aarch64-linux-gnu
+          - x86_64-w64-mingw32
+          - x86_64-apple-darwin
+          - arm64-apple-darwin
+    name: build ${{ matrix.host }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: remove bundled packages
+        # Frees disk space for /gnu/store, and keeps the installer's
+        # /usr/local/bin/guix from clashing with anything preinstalled
+        run: sudo rm -rf /usr/local
+      # The files fetch.sh downloads, kept between runs. Everything in it is
+      # checked against contrib/guix/downloads.txt, so the cache can't change the output.
+      - name: download cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: guix-cache
+          key: guix-cache-${{ matrix.host }}-${{ hashFiles('contrib/guix/downloads.txt') }}
+      - name: install dependencies
+        run: sudo apt-get update; sudo apt-get -y install git ca-certificates apparmor-utils
+      - name: apparmor workaround
+        # https://bugs.launchpad.net/ubuntu/+source/guix/+bug/2064115
+        # Ubuntu 24.04 blocks unprivileged user namespaces, which
+        # guix shell --container needs
+        run: |
+          sudo tee /etc/apparmor.d/guix << EOF
+          abi <abi/3.0>,
+          include <tunables/global>
+          profile guix /gnu/store/{*-guix-command,*/bin/guix-daemon,*/bin/guix,*/bin/guile} flags=(unconfined) {
+            userns,
+            include if exists <local/guix>
+          }
+          EOF
+          sudo /etc/init.d/apparmor reload
+          sudo aa-enforce guix || true
+          sudo apt-get -y purge apparmor
+      - name: install guix
+        run: |
+          set -exo pipefail
+
+          export ARCHIVE="guix-binary-1.5.0.x86_64-linux.tar.xz"
+          export ARCHIVE_HASH=aa41025489c5061543e9c48873eaa829b900b2da75d40f9648913622f5f47817
+
+          wget --tries=5 --waitretry=10 --no-verbose https://mirrors.ocf.berkeley.edu/gnu/guix/${ARCHIVE} -O /tmp/${ARCHIVE}
+          echo "${ARCHIVE_HASH}  /tmp/${ARCHIVE}" | sha256sum -c -
+
+          # The installer Feather uses, pinned: it installs non-interactively
+          # from a local binary tarball
+          curl -fsSL https://raw.githubusercontent.com/monero-project/guix/7fd75725c5daf9d3bdfd9122dcdb37f650493d18/etc/guix-install.sh -o /tmp/guix-install.sh
+          chmod +x /tmp/guix-install.sh
+
+          { yes "" 2>/dev/null || true; } | sudo env GUIX_BINARY_FILE_NAME="/tmp/${ARCHIVE}" /tmp/guix-install.sh
+          source /etc/profile.d/zzz-guix.sh
+          /usr/local/bin/guix --version
+      - name: macOS SDK
+        if: endsWith(matrix.host, '-apple-darwin')
+        # Bitcoin Core's extracted Xcode 26.1.1 SDK, checked against its sha256
+        run: |
+          set -exo pipefail
+          mkdir -p "$HOME/SDKs"
+          SDK=Xcode-26.1.1-17B100-extracted-SDK-with-libcxx-headers
+          wget --tries=5 --waitretry=10 --no-verbose "https://bitcoincore.org/depends-sources/sdks/${SDK}.tar" -O "/tmp/${SDK}.tar"
+          echo "9600fa93644df674ee916b5e2c8a6ba8dacf631996a65dc922d003b98b5ea3b1  /tmp/${SDK}.tar" | sha256sum -c -
+          tar -C "$HOME/SDKs" -xf "/tmp/${SDK}.tar"
+      - name: build
+        id: build
+        env:
+          HOSTS: ${{ matrix.host }}
+        run: |
+          SDK_PATH="$HOME/SDKs" ./contrib/guix/guix-build
+          echo "sums=$(ls guix-build-*/output/"$HOSTS"/SHA256SUMS.part)" >> "$GITHUB_OUTPUT"
+      - name: attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: ${{ steps.build.outputs.sums }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: guix-${{ matrix.host }}
+          path: guix-build-*/output/${{ matrix.host }}/*
+          if-no-files-found: error
+
+  test:
+    # Each Guix wheel on its own platform, with the oldest and newest CPython
+    # its cp311-abi3 tag covers; the sdist built from source with the runner's compiler
+    needs: [build-guix]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { host: x86_64-linux-gnu,    runner: ubuntu-24.04,     python: '3.11' }
+          - { host: x86_64-linux-gnu,    runner: ubuntu-24.04,     python: '3.14' }
+          - { host: aarch64-linux-gnu,   runner: ubuntu-24.04-arm, python: '3.14' }
+          - { host: x86_64-w64-mingw32,  runner: windows-2025,     python: '3.11' }
+          - { host: x86_64-w64-mingw32,  runner: windows-2025,     python: '3.14' }
+          - { host: x86_64-apple-darwin, runner: macos-15-intel,   python: '3.14' }
+          - { host: arm64-apple-darwin,  runner: macos-15,         python: '3.11' }
+          - { host: arm64-apple-darwin,  runner: macos-15,         python: '3.14' }
+          - { host: sdist,               runner: ubuntu-24.04,     python: '3.14' }
+    name: test ${{ matrix.host }} (Python ${{ matrix.python }})
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: guix-${{ matrix.host }}
+          path: dist
+      - name: install
+        env:
+          HOST: ${{ matrix.host }}
+        run: |
+          ls -l dist
+          if [ "$HOST" = sdist ]; then
+            # builds from source; setuptools comes from PyPI (build isolation)
+            python -m pip install dist/*.tar.gz
+          else
+            # --no-index: only the Guix-built wheel, nothing from PyPI
+            python -m pip install --no-index --no-deps dist/*.whl
+          fi
+          python -m pip show -f vertcoinhash
+      - name: test
+        # from outside the checkout, so the installed modules are imported
+        working-directory: ${{ runner.temp }}
+        env:
+          TEST: ${{ github.workspace }}/ci-test/test.py
+        run: python "$TEST"
+
+  test-verthash:
+    # The tests above skip Verthash, which needs the 1.2 GiB verthash.dat.
+    # Generate it once with h1 and check the Guix wheel's hash against it.
+    needs: [build-guix]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    name: test Verthash (x86_64-linux-gnu)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: guix-x86_64-linux-gnu
+          path: dist
+      - name: generate verthash.dat
+        run: |
+          make h1
+          ./h1
+          echo "a55531e843cd56b010114aaf6325b0d529ecf88f8ad47639b6ededafd721aa48  verthash.dat" | sha256sum -c -
+      - name: test
+        run: |
+          python -m pip install --no-index --no-deps dist/*.whl
+          cd "$RUNNER_TEMP"
+          VERTHASH_DATAFILE="$GITHUB_WORKSPACE/verthash.dat" REQUIRE_VERTHASH=1 python "$GITHUB_WORKSPACE/ci-test/test.py"
+
+  hashes:
+    runs-on: ubuntu-24.04
+    needs: [build-guix]
+    timeout-minutes: 15
+    steps:
+      # One folder per artifact: every host's file is called SHA256SUMS.part,
+      # so they must not be merged into one folder
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      - name: print hashes
+        run: |
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          find . -name 'SHA256SUMS.part' -print0 | env LC_ALL=C sort -z | xargs -r0 cat | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  upload-pypi:
+    name: upload to PyPI
+    needs: [test, test-verthash]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # upload to PyPI on every tag starting with 'v'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: guix-*
+          path: artifacts
+      - name: collect the wheels and sdist
+        run: |
+          mkdir dist
+          find artifacts \( -name '*.whl' -o -name '*.tar.gz' \) -exec cp -t dist {} +
+          ls -l dist
+          # one sdist and a wheel for each of the five platforms
+          [ "$(ls dist | wc -l)" = 6 ]
+          (cd dist && sha256sum *)
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          user: __token__
+          password: ${{ secrets.pypi_password }}

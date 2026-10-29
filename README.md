@@ -8,17 +8,50 @@
 pip install vertcoinhash
 ```
 
-[PyPI packages](https://pypi.org/project/vertcoinhash/) are built on [cibuildwheel](https://github.com/pypa/cibuildwheel) using [Github actions](https://github.com/vertcoin-project/vertcoinhash-python/blob/master/.github/workflows/build_wheels.yml)
+The [PyPI packages](https://pypi.org/project/vertcoinhash/) are built reproducibly with [Guix](contrib/guix/README.md).
+[GitHub Actions](https://github.com/vertcoin-project/vertcoinhash-python/blob/master/.github/workflows/guix.yml)
+runs that build for each tag, tests every wheel on its own platform, and uploads the same files to PyPI.
+
+There is one wheel per platform for CPython 3.11 and later: Linux (x86_64, aarch64), macOS (x86_64, arm64) and Windows (AMD64).
+Older CPythons build the sdist from source.
+
+## Usage
+
+Each module has `getPoWHash(header)`, which takes an 80-byte block header (any bytes-like object) and returns the 32-byte hash:
+
+| module | proof of work | Vertcoin blocks |
+|---|---|---|
+| `vtc_scrypt_new` | scrypt-N | below 208,301 |
+| `lyra2re_hash` | Lyra2RE | 208,301 to 346,999 |
+| `lyra2re2_hash` | Lyra2REv2 | 347,000 to 1,080,000 |
+| `lyra2re3_hash` | Lyra2REv3 | 1,080,001 to 1,499,999 |
+| `verthash` | Verthash | 1,500,000 and later |
+
+`verthash.getPoWHash(header, datfile)` also takes the contents of verthash.dat. That can be a read-only `mmap`, so the 1.2 GiB file need not be read into memory:
+
+```python
+import mmap, verthash
+
+with open('verthash.dat', 'rb') as f:
+    datfile = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+pow_hash = verthash.getPoWHash(header, datfile)
+```
+
+A header that is not 80 bytes raises `ValueError`. The GIL is released while hashing.
 
 ## Building vertcoinhash package from source
 ```
 git clone https://github.com/vertcoin-project/vertcoinhash-python && cd vertcoinhash-python
-python setup.py install
+python -m pip install .
 ```
+
+gcc and clang builds use `-fno-strict-aliasing`. Without it, gcc at -O2 and above miscompiles
+scrypt-N, Lyra2REv2 and Lyra2REv3, which then return wrong (even varying) hashes.
 
 ## Testing vertcoinhash package
 
-test.py runs a trial hashing of a dummy header on all five proofs of work used by Vertcoin
+test.py checks a trial hashing of a dummy header on all five proofs of work used by Vertcoin.
+Verthash is checked when verthash.dat is in the current directory or named by `VERTHASH_DATAFILE`.
 ```
 python test.py
     scrypt-n f48c557d72190f1734e20d1a2db41bdde7fecf506b7c89897ae1f5bd67355728

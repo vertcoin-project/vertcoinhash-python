@@ -50,7 +50,7 @@ with open('README.md', encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='vertcoinhash',
-      version='1.1.0',
+      version='1.1.1',
       author_email='vertion@protonmail.com',
       author='vertion',
       url='https://github.com/vertcoin-project/vertcoinhash-python',

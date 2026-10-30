@@ -3,6 +3,10 @@
 for the same inputs: entries sorted, fixed times and permissions.
 
     wheel.py OUTDIR TAG MODDIR SRCDIR
+
+TAG may be a compressed tag set (PEP 425), e.g. with the platform tag
+manylinux_2_17_x86_64.manylinux2014_x86_64: the file name keeps it, and WHEEL
+lists each tag it stands for.
 """
 import base64
 import hashlib
@@ -13,6 +17,7 @@ import sys
 import zipfile
 
 outdir, tag, moddir, srcdir = sys.argv[1:]
+python_tags, abi_tags, platform_tags = (part.split('.') for part in tag.split('-'))
 
 setup_py = open(os.path.join(srcdir, 'setup.py'), encoding='utf-8').read()
 
@@ -47,7 +52,7 @@ wheel_meta = '\n'.join([
     'Wheel-Version: 1.0',
     'Generator: vertcoinhash contrib/guix',
     'Root-Is-Purelib: false',
-    f'Tag: {tag}',
+    *[f'Tag: {p}-{a}-{t}' for p in python_tags for a in abi_tags for t in platform_tags],
     '',
 ])
 modules = sorted(os.listdir(moddir))

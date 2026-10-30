@@ -5,12 +5,15 @@
 #
 # Environment:
 #   HOSTS      what to build (default: all of them)
-#                sdist                vertcoinhash-<version>.tar.gz
-#                x86_64-linux-gnu     ...-cp311-abi3-manylinux_2_31_x86_64.whl
-#                aarch64-linux-gnu    ...-cp311-abi3-manylinux_2_31_aarch64.whl
-#                x86_64-w64-mingw32   ...-cp311-abi3-win_amd64.whl
-#                x86_64-apple-darwin  ...-cp311-abi3-macosx_11_0_x86_64.whl
-#                arm64-apple-darwin   ...-cp311-abi3-macosx_11_0_arm64.whl
+#                sdist                 vertcoinhash-<version>.tar.gz
+#                x86_64-linux-gnu      ...-cp311-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+#                aarch64-linux-gnu     ...-cp311-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl
+#                arm-linux-gnueabihf   ...-cp311-abi3-manylinux_2_17_armv7l.manylinux2014_armv7l.whl
+#                powerpc64le-linux-gnu ...-cp311-abi3-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl
+#                riscv64-linux-gnu     ...-cp311-abi3-manylinux_2_27_riscv64.whl
+#                x86_64-w64-mingw32    ...-cp311-abi3-win_amd64.whl
+#                x86_64-apple-darwin   ...-cp311-abi3-macosx_11_0_x86_64.whl
+#                arm64-apple-darwin    ...-cp311-abi3-macosx_11_0_arm64.whl
 #   SDK_PATH   directory holding Xcode-26.1.1-17B100-extracted-SDK-with-libcxx-headers,
 #              needed for the macOS hosts (see contrib/guix/README.md)
 #   JOBS       parallel jobs (default: nproc)
@@ -26,7 +29,7 @@ cd "$(git rev-parse --show-toplevel)"
 # manifest.scm build exactly as they do there.
 GUIX_COMMIT=c5eee3336cc1d10a3cc1c97fde2809c3451624d3
 
-ALL_HOSTS="sdist x86_64-linux-gnu aarch64-linux-gnu x86_64-w64-mingw32 x86_64-apple-darwin arm64-apple-darwin"
+ALL_HOSTS="sdist x86_64-linux-gnu aarch64-linux-gnu arm-linux-gnueabihf powerpc64le-linux-gnu riscv64-linux-gnu x86_64-w64-mingw32 x86_64-apple-darwin arm64-apple-darwin"
 HOSTS="${HOSTS:-$ALL_HOSTS}"
 JOBS="${JOBS:-$(nproc)}"
 CACHE_PATH="${CACHE_PATH:-$PWD/guix-cache}"

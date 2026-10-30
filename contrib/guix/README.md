@@ -8,8 +8,11 @@ same commit gives the same files byte for byte.
 | `HOSTS` entry | Output |
 |---|---|
 | `sdist` | `vertcoinhash-<version>.tar.gz` |
-| `x86_64-linux-gnu` | `vertcoinhash-<version>-cp311-abi3-manylinux_2_31_x86_64.whl` |
-| `aarch64-linux-gnu` | `vertcoinhash-<version>-cp311-abi3-manylinux_2_31_aarch64.whl` |
+| `x86_64-linux-gnu` | `vertcoinhash-<version>-cp311-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl` |
+| `aarch64-linux-gnu` | `vertcoinhash-<version>-cp311-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl` |
+| `arm-linux-gnueabihf` | `vertcoinhash-<version>-cp311-abi3-manylinux_2_17_armv7l.manylinux2014_armv7l.whl` |
+| `powerpc64le-linux-gnu` | `vertcoinhash-<version>-cp311-abi3-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl` |
+| `riscv64-linux-gnu` | `vertcoinhash-<version>-cp311-abi3-manylinux_2_27_riscv64.whl` |
 | `x86_64-w64-mingw32` | `vertcoinhash-<version>-cp311-abi3-win_amd64.whl` |
 | `x86_64-apple-darwin` | `vertcoinhash-<version>-cp311-abi3-macosx_11_0_x86_64.whl` |
 | `arm64-apple-darwin` | `vertcoinhash-<version>-cp311-abi3-macosx_11_0_arm64.whl` |
@@ -33,8 +36,10 @@ The macOS hosts need `SDK_PATH`, a directory holding Bitcoin Core's
   Only their headers are used, and on Windows `python3.dll` to link against.
 - **build** (`libexec/build.sh`) runs one container per host, without network, and compiles
   the five modules with `setup.py`'s flags (`-O3 -fno-strict-aliasing`, `-std=c99` for verthash):
-  - Linux: Bitcoin Core's GCC 14 targeting glibc 2.31, so the wheels are `manylinux_2_31`. The build
-    checks that each module needs only `libc.so.6` and no glibc symbol newer than 2.31.
+  - Linux (x86_64, aarch64, armv7l, ppc64le, riscv64): Bitcoin Core's GCC 14 targeting glibc 2.31.
+    The build checks that each module needs only `libc.so.6` (and the target's dynamic loader)
+    and no glibc symbol newer than 2.17, or 2.27 on riscv64, where glibc starts: so the wheels are
+    `manylinux_2_17` (also tagged `manylinux2014`, for pip before 20.3), and `manylinux_2_27` on riscv64.
   - Windows: Bitcoin Core's MinGW-w64 toolchain, linked against `python3.dll`.
   - macOS: clang/lld 19 against the SDK. lld signs the arm64 modules ad hoc.
 - **wheels**: `libexec/wheel.py` writes each wheel with sorted entries and fixed times. They are

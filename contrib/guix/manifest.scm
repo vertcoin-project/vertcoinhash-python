@@ -5,7 +5,8 @@
 ;; The cross toolchains, from base-binutils to glibc-2.31 below, are copied
 ;; unchanged from Bitcoin Core v32.0's contrib/guix/manifest_build.scm (MIT
 ;; licence, The Bitcoin Core developers), as are the files in patches/: GCC 14
-;; targeting glibc 2.31 for Linux, so the wheels are manylinux_2_31, and a
+;; targeting glibc 2.31 for Linux (whose symbols the wheels use are from 2.17,
+;; or 2.27 on riscv64, so the wheels are manylinux_2_17 or _2_27), and a
 ;; MinGW-w64 toolchain for Windows. Vertcoin Core and Electrum-VTC carry the same
 ;; definitions at the same Guix commit, so a machine that has built either
 ;; already has these toolchains in its store.

@@ -103,21 +103,32 @@ case "$HOST" in
             -C /tmp/sdist2 -cf - "$dir" | gzip -9n > "/outdir/$out"
         ;;
 
-    *-linux-gnu)
-        arch="${HOST%%-*}"
-        extract_python "${PBS}-${arch}-unknown-linux-gnu-install_only.tar.gz"
+    *-linux-gnu|*-linux-gnueabihf)
+        # python-build-standalone's name for the target, its wheel platform, its dynamic
+        # loader, and the newest glibc its wheel may need: the oldest manylinux, glibc 2.17
+        # (manylinux2014), except on riscv64, whose first glibc is 2.27. The modules are
+        # built against glibc 2.31, but its symbols they use are older.
+        case "$HOST" in
+            x86_64-linux-gnu)      pbs_arch=x86_64-unknown-linux-gnu      arch=x86_64  loader=ld-linux-x86-64.so.2        floor=2.17 ;;
+            aarch64-linux-gnu)     pbs_arch=aarch64-unknown-linux-gnu     arch=aarch64 loader=ld-linux-aarch64.so.1       floor=2.17 ;;
+            arm-linux-gnueabihf)   pbs_arch=armv7-unknown-linux-gnueabihf arch=armv7l  loader=ld-linux-armhf.so.3         floor=2.17 ;;
+            powerpc64le-linux-gnu) pbs_arch=ppc64le-unknown-linux-gnu     arch=ppc64le loader=ld64.so.2                   floor=2.17 ;;
+            riscv64-linux-gnu)     pbs_arch=riscv64-unknown-linux-gnu     arch=riscv64 loader=ld-linux-riscv64-lp64d.so.1 floor=2.27 ;;
+            *) echo "ERR: no wheel platform for $HOST" >&2; exit 1 ;;
+        esac
+        extract_python "${PBS}-${pbs_arch}-install_only.tar.gz"
         cross_paths "$(store_path "glibc-cross-${HOST}")" "$(store_path "linux-libre-headers-cross-${HOST}")"
         echo "== modules ($HOST)"
         build_modules "${HOST}-gcc" "$BASE_CFLAGS -fPIC -I/tmp/pbs/python/include/python3.12" .abi3.so \
             -shared -Wl,-O1 -Wl,--as-needed -Wl,-z,relro -Wl,-z,now
         for m in /tmp/modules/*; do
             "${HOST}-strip" --strip-unneeded -R .comment "$m"
-            # manylinux: only libc (and on aarch64 the dynamic loader, which exports
+            # manylinux: only libc (and on some targets the dynamic loader, which exports
             # the stack protector's __stack_chk_guard there), nothing newer than
-            # glibc 2.31, no search path
+            # glibc $floor, no search path
             needed="$("${HOST}-readelf" -d "$m" | sed -n 's/.*(NEEDED).*\[\(.*\)\]/\1/p' | tr '\n' ' ')"
             case "$needed" in
-                "libc.so.6 "|"libc.so.6 ld-linux-aarch64.so.1 ") ;;
+                "libc.so.6 "|"libc.so.6 $loader ") ;;
                 *) echo "ERR: $(basename "$m") needs: $needed" >&2; exit 1 ;;
             esac
             if [ "$needed" != "libc.so.6 " ]; then
@@ -125,10 +136,13 @@ case "$HOST" in
             fi
             if "${HOST}-readelf" -d "$m" | grep -E 'RPATH|RUNPATH'; then echo "ERR: search path in $m" >&2; exit 1; fi
             newest="$("${HOST}-readelf" -V --wide "$m" | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)"
-            printf '%s\n' "$newest" GLIBC_2.31 | sort -CV || { echo "ERR: $(basename "$m") needs $newest" >&2; exit 1; }
+            printf '%s\n' "$newest" "GLIBC_$floor" | sort -CV || { echo "ERR: $(basename "$m") needs $newest" >&2; exit 1; }
             echo "$(basename "$m"): needs $needed, newest symbol $newest"
         done
-        python3 /libexec/wheel.py /outdir "${ABI}-manylinux_2_31_${arch}" /tmp/modules "$SRC"
+        plat="manylinux_${floor/./_}_${arch}"
+        # and manylinux2014's own name for glibc 2.17, for pip before 20.3
+        [ "$floor" = 2.17 ] && plat="${plat}.manylinux2014_${arch}"
+        python3 /libexec/wheel.py /outdir "${ABI}-${plat}" /tmp/modules "$SRC"
         ;;
 
     x86_64-w64-mingw32)

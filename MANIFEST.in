@@ -13,3 +13,4 @@ include Sponge.h
 include tiny_sha3/sha3.h
 include h2.h
 include verthash_datfile.h
+include module_slots.h

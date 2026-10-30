@@ -145,6 +145,8 @@ jobs:
           - { host: arm64-apple-darwin,  runner: macos-15,         python: '3.11' }
           - { host: arm64-apple-darwin,  runner: macos-15,         python: '3.14' }
           - { host: sdist,               runner: ubuntu-24.04,     python: '3.14' }
+          # free-threaded: abi3 wheels don't load there, so pip builds the sdist
+          - { host: sdist,               runner: ubuntu-24.04,     python: '3.14t' }
     name: test ${{ matrix.host }} (Python ${{ matrix.python }})
     defaults:
       run:

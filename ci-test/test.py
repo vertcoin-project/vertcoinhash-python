@@ -11,6 +11,7 @@ import hashlib
 import mmap
 import os
 import sys
+import sysconfig
 import tempfile
 import threading
 import time
@@ -36,6 +37,12 @@ VERTHASH = 'e0f6c10b4a38f35a6cdcc26d32a7ed8c3bfc5d827a9bc72647afa324b70d0463'
 DATAFILE_SHA256 = 'a55531e843cd56b010114aaf6325b0d529ecf88f8ad47639b6ededafd721aa48'
 
 failed = False
+
+# on free-threaded CPython, importing the modules must not have enabled the GIL
+if sysconfig.get_config_var('Py_GIL_DISABLED'):
+    gil_enabled = sys._is_gil_enabled()
+    failed |= gil_enabled
+    print(f"free-threaded: the GIL {'was enabled: MISMATCH' if gil_enabled else 'is still disabled: ok'}")
 
 
 def check(name, got, want):

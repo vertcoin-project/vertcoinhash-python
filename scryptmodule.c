@@ -1,5 +1,6 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
+#include "module_slots.h"
 
 #include "scrypt.h"
 
@@ -66,10 +67,11 @@ static struct PyModuleDef VTCScryptModule = {
     PyModuleDef_HEAD_INIT,
     "vtc_scrypt_new",
     "scrypt-N proof of work hash used by Vertcoin",
-    -1,
-    ScryptMethods
+    0,
+    ScryptMethods,
+    vertcoinhash_module_slots
 };
 
 PyMODINIT_FUNC PyInit_vtc_scrypt_new(void) {
-    return PyModule_Create(&VTCScryptModule);
+    return PyModuleDef_Init(&VTCScryptModule);
 }

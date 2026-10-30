@@ -1,5 +1,6 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
+#include "module_slots.h"
 
 #include "Lyra2RE.h"
 
@@ -33,10 +34,11 @@ static struct PyModuleDef Lyra2REv3Module = {
     PyModuleDef_HEAD_INIT,
     "lyra2re3_hash",
     "Lyra2REv3 proof of work hash used by Vertcoin",
-    -1,
-    Lyra2REv3Methods
+    0,
+    Lyra2REv3Methods,
+    vertcoinhash_module_slots
 };
 
 PyMODINIT_FUNC PyInit_lyra2re3_hash(void) {
-    return PyModule_Create(&Lyra2REv3Module);
+    return PyModuleDef_Init(&Lyra2REv3Module);
 }

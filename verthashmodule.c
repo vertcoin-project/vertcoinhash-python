@@ -1,5 +1,6 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
+#include "module_slots.h"
 
 #include <errno.h>
 
@@ -133,10 +134,11 @@ static struct PyModuleDef VerthashModule = {
     PyModuleDef_HEAD_INIT,
     "verthash",
     "Verthash proof of work hash used by Vertcoin",
-    -1,
-    VerthashMethods
+    0,
+    VerthashMethods,
+    vertcoinhash_module_slots
 };
 
 PyMODINIT_FUNC PyInit_verthash(void) {
-    return PyModule_Create(&VerthashModule);
+    return PyModuleDef_Init(&VerthashModule);
 }

@@ -50,8 +50,9 @@ The macOS hosts need `SDK_PATH`, a directory holding Bitcoin Core's
 `.github/workflows/guix.yml` runs this build on tags and by hand, and prints the hashes to
 compare with a local build. It then tests each wheel on its own platform with CPython 3.11
 and 3.14, builds the sdist from source, and checks Verthash against a `verthash.dat`
-generated with `h1`. When every test passes on a `v*` tag, it uploads the same six files to PyPI,
-using the `pypi_password` secret (a PyPI API token).
+generated with `h1`. When every test passes on a `v*` tag, it uploads the same nine files to PyPI, as
+the project's trusted publisher (the `pypi` environment of this workflow), with attestations
+of their provenance.
 
 To release: bump the version in `setup.py`, commit, then push a `v<version>` tag. Before
 pushing the tag, a local `./contrib/guix/guix-build` of that commit should give the same hashes.

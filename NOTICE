@@ -5,6 +5,10 @@ The vertcoinhash modules are built from the code below as well as this
 project's own, which LICENSE covers. Each part is followed by the license
 it is published under, as it is published.
 
+The Lyra2RE, sphlib and Lyra2 files, and the Scrypt-N schedule in
+scryptmodule.c, come from Vertcoin Core, MIT licensed since 2014 by the
+Vertcoin developers that LICENSE names.
+
 
 verthash: verthash_datfile.c (and h1.c, which is not built)
 -----------------------------------------------------------
@@ -126,6 +130,9 @@ online backup system.
 Lyra2RE.c
 ---------
 
+From Vertcoin Core's src/crypto/Lyra2RE/,
+https://github.com/vertcoin-project/vertcoin-core
+
 Copyright 2009 Colin Percival, 2011 ArtForz, 2013 Neisklar, 2014 James Lovejoy
 All rights reserved.
 
@@ -157,6 +164,9 @@ online backup system.
 sha3/: BLAKE, BMW, CubeHash, Groestl, Keccak and Skein from sphlib
 ------------------------------------------------------------------
 
+From Vertcoin Core's src/crypto/Lyra2RE/,
+https://github.com/vertcoin-project/vertcoin-core
+
 Copyright (c) 2007-2010  Projet RNRT SAPHIR
 
 Permission is hereby granted, free of charge, to any person obtaining
@@ -181,6 +191,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Lyra2.c and Sponge.c
 --------------------
+
+From Vertcoin Core's src/crypto/Lyra2RE/,
+https://github.com/vertcoin-project/vertcoin-core
 
 By the Lyra PHC team, http://www.lyra-kdf.net/, and placed in the public
 domain.

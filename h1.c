@@ -1,3 +1,8 @@
+/* The graph of verthash.dat, ported from pos/graph.go in Albert Kwon's
+ * Spacemint, https://github.com/kwonalbert/spacemint, MIT license; see NOTICE.
+ * Not built: verthash_datfile.c generates the datafile.
+ */
+
 #include <memory.h>
 #include <stdint.h>
 #include <stdio.h>

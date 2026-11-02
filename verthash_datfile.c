@@ -6,6 +6,9 @@
  * SHA3-256 (src/crypto/sha3.cpp), about four times faster than tiny_sha3's.
  * The map lets the OS page the file out, so it needs no 1.2 GiB of memory.
  *
+ * The graph is ported from pos/graph.go in Albert Kwon's Spacemint,
+ * https://github.com/kwonalbert/spacemint, MIT license; see NOTICE.
+ *
  * keccakf: Copyright (c) 2020-present The Bitcoin Core developers, MIT license,
  * based on https://github.com/mjosaarinen/tiny_sha3 by Markku-Juhani O. Saarinen.
  */

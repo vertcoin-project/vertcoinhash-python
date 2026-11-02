@@ -61,6 +61,8 @@ top_level = ''.join(m.split('.')[0] + '\n' for m in modules)
 distinfo = f'{name}-{version}.dist-info'
 files = [(m, open(os.path.join(moddir, m), 'rb').read(), 0o755) for m in modules]
 files += [
+    # The licenses of the code the modules are built from, which ask to go with them
+    *[(f'{distinfo}/{f}', open(os.path.join(srcdir, f), 'rb').read(), 0o644) for f in ('LICENSE', 'NOTICE')],
     (f'{distinfo}/METADATA', metadata.encode(), 0o644),
     (f'{distinfo}/WHEEL', wheel_meta.encode(), 0o644),
     (f'{distinfo}/top_level.txt', top_level.encode(), 0o644),
